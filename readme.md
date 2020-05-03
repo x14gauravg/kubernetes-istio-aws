@@ -1,0 +1,38 @@
+
+# AWS CREDENTIALS
+ export AWS_ACCESS_KEY_ID= <YOUR KEY> 
+ export AWS_SECRET_ACCESS_KEY= <YOUR KEY>
+
+# set AWS region and s3 bucket where you will store cluster configuration
+ export AWS_DEFAULT_REGION=us-east-2
+ export KOPS_STATE_STORE=s3://<YOUR BUCKET NAME>
+
+# set cluster name
+ export NAME=dzonetestcluster.k8s.local
+
+# create cluster using kops.  This will create configuration in s3. It will not fire new cluster on AWS
+ kops create cluster --zones us-east-2a,us-east-2b,us-east-2c ${NAME}
+
+# Create keys , needed for kops
+ ssh-keygen -b 2048 -t rsa -f id_rsa
+
+# Create secret in kops
+ kops create secret --name ${NAME} sshpublickey admin -i id_rsa.pub
+
+# i am changing here the instances used to t2.medium.  You can also go with defaults and these steps may not be executed in that case
+kops delete ig --name=${NAME} nodes  --yes
+cat instancegroup.yaml | kops create --name=${NAME} -f -
+
+# Create cluster, finally !
+kops update cluster ${NAME} --yes
+
+
+# This could take minutes to create cluster because LB etc. will be provisioned. use this command to check for completion. Do not worry if it fails initially because it takes time to create cluster on NAWS
+watch kops validate cluster
+
+# Once cluster is ready, you can run kubectl to check working
+Kubectl get nodes —show-labels
+
+
+# In order to delete cluster.  It can be expensive to run on AWS and not using it
+Kops delete cluster —name ${NAME} --yes
