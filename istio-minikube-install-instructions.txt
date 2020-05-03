@@ -1,0 +1,6 @@
+# just apply file istio_default_k8_native.yaml on the cluster
+
+kubectl apply -f istio_demo_k8_native.yaml
+
+
+# when you applky the file, you will get some errors such as objects not created, apply the file again.  This is because certain yaml objects are created at last of the file, which some of the previous objects require first

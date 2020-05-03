@@ -7,7 +7,7 @@
  export AWS_DEFAULT_REGION=us-east-2
  export KOPS_STATE_STORE=s3://<YOUR BUCKET NAME>
 
-# set cluster name
+# set cluster name. please retain k8s.local This saves you hassels of creating routes etc.
  export NAME=dzonetestcluster.k8s.local
 
 # create cluster using kops.  This will create configuration in s3. It will not fire new cluster on AWS
