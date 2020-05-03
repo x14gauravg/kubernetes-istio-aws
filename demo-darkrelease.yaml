@@ -1,0 +1,267 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    istio-injection: enabled
+  name: default
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: helloconfig
+data:
+  MESSAGE: I just deployed this on Kubernetes!
+  PORT: "8090"
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: helloconfigrisky
+data:
+  MESSAGE: Risky Kubernetes!
+  PORT: "8090"
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-kubernetes-safe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-kubernetes
+  template:
+    metadata:
+      labels:
+        app: hello-kubernetes
+        version: safe
+    spec:
+      containers:
+        - name: hello-kubernetes
+          image: paulbouwer/hello-kubernetes:1.8
+          ports:
+            - containerPort: 8090
+          envFrom:
+            - configMapRef:
+                name: helloconfig
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-kubernetes-risky
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-kubernetes
+  template:
+    metadata:
+      labels:
+        app: hello-kubernetes
+        version: risky
+    spec:
+      containers:
+        - name: hello-kubernetes-risky
+          image: paulbouwer/hello-kubernetes:1.8
+          ports:
+            - containerPort: 8090
+          envFrom:
+            - configMapRef:
+                name: helloconfigrisky
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: greeting
+spec:
+  selector:
+    app: hello-kubernetes
+  ports:
+    - name: http
+      port: 8090
+  type: ClusterIP
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: messageconfig
+data:
+  SERVICE_URL: greeting
+  SERVICE_PORT: "8090"
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: message
+  template:
+    metadata:
+      labels:
+        app: message
+    spec:
+      containers:
+        - name: message
+          image: x14gauravg/message
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: messageconfig
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: message
+spec:
+  selector:
+    app: message
+  ports:
+    - name: http
+      port: 8080
+  type: ClusterIP
+
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: greeting
+  namespace: default
+spec:
+  hosts:      # which incoming host are we applying the proxy rules to???
+    - greeting.default.svc.cluster.local # Copy the value in the gateway hosts - usually a Domain Name
+  http:
+    - route:
+        - destination:
+            host: greeting.default.svc.cluster.local # The Target DNS name
+            subset: safe  # The name defined in the DestinationRule
+          weight: 80
+        - destination:
+            host: greeting.default.svc.cluster.local # The Target DNS name
+            subset: risky  # The name defined in the DestinationRule
+          weight: 20
+
+---
+
+kind: DestinationRule
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: greeting
+  namespace: default
+spec:
+  host: greeting.default.svc.cluster.local
+  subsets:
+    - labels:   # SELECTOR.
+        version: safe # find pods with label "safe"
+      name: safe
+    - labels:
+        version: risky
+      name: risky
+
+
+#---
+#
+#kind: VirtualService
+#apiVersion: networking.istio.io/v1alpha3
+#metadata:
+#  name: hello-kubernetes
+#  namespace: default
+#spec:
+#  hosts:      # which incoming host are we applying the proxy rules to???
+#    - greeting.default.svc.cluster.local # Copy the value in the gateway hosts - usually a Domain Name
+#  http:
+#    - match:
+#        - headers:
+#            x-my-header:
+#              exact: dark
+#      route:
+#        - destination:
+#            host: greeting.default.svc.cluster.local
+#            subset: risky
+#    - route:
+#        - destination:
+#            host: greeting.default.svc.cluster.local # The Target DNS name
+#            subset: safe  # The name defined in the DestinationRule
+#
+#---
+#
+#kind: DestinationRule
+#apiVersion: networking.istio.io/v1alpha3
+#metadata:
+#  name: greeting
+#  namespace: default
+#spec:
+#  host: greeting
+#  subsets:
+#    - labels:   # SELECTOR.
+#        version: safe # find pods with label "safe"
+#      name: safe
+#    - labels:
+#        version: risky
+#      name: risky
+
+---
+
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingress-gateway-configuration
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"   # Domain name of the external website
+---
+
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: hello-gateway
+  namespace: default
+spec:
+  hosts:      # which incoming host are we applying the proxy rules to???
+    - "*"
+  gateways:
+    - ingress-gateway-configuration
+  http:
+    - route: # CATCH ALL
+        - destination:
+            host: message
+            subset: safe
+---
+
+kind: DestinationRule
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: hello-gateway
+  namespace: default
+spec:
+  host: message
+  subsets:
+    - labels:
+        app: message
+      name: safe
+
+
+
