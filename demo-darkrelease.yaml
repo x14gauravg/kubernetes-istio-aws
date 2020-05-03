@@ -137,24 +137,30 @@ spec:
   type: ClusterIP
 
 ---
+
+
+
 kind: VirtualService
 apiVersion: networking.istio.io/v1alpha3
 metadata:
-  name: greeting
+  name: hello-kubernetes
   namespace: default
 spec:
   hosts:      # which incoming host are we applying the proxy rules to???
     - greeting.default.svc.cluster.local # Copy the value in the gateway hosts - usually a Domain Name
   http:
+    - match:
+        - headers:
+            x-my-header:
+              exact: dark
+      route:
+        - destination:
+            host: greeting.default.svc.cluster.local
+            subset: risky
     - route:
         - destination:
             host: greeting.default.svc.cluster.local # The Target DNS name
             subset: safe  # The name defined in the DestinationRule
-          weight: 80
-        - destination:
-            host: greeting.default.svc.cluster.local # The Target DNS name
-            subset: risky  # The name defined in the DestinationRule
-          weight: 20
 
 ---
 
@@ -164,7 +170,7 @@ metadata:
   name: greeting
   namespace: default
 spec:
-  host: greeting.default.svc.cluster.local
+  host: greeting
   subsets:
     - labels:   # SELECTOR.
         version: safe # find pods with label "safe"
@@ -172,48 +178,6 @@ spec:
     - labels:
         version: risky
       name: risky
-
-
-#---
-#
-#kind: VirtualService
-#apiVersion: networking.istio.io/v1alpha3
-#metadata:
-#  name: hello-kubernetes
-#  namespace: default
-#spec:
-#  hosts:      # which incoming host are we applying the proxy rules to???
-#    - greeting.default.svc.cluster.local # Copy the value in the gateway hosts - usually a Domain Name
-#  http:
-#    - match:
-#        - headers:
-#            x-my-header:
-#              exact: dark
-#      route:
-#        - destination:
-#            host: greeting.default.svc.cluster.local
-#            subset: risky
-#    - route:
-#        - destination:
-#            host: greeting.default.svc.cluster.local # The Target DNS name
-#            subset: safe  # The name defined in the DestinationRule
-#
-#---
-#
-#kind: DestinationRule
-#apiVersion: networking.istio.io/v1alpha3
-#metadata:
-#  name: greeting
-#  namespace: default
-#spec:
-#  host: greeting
-#  subsets:
-#    - labels:   # SELECTOR.
-#        version: safe # find pods with label "safe"
-#      name: safe
-#    - labels:
-#        version: risky
-#      name: risky
 
 ---
 
